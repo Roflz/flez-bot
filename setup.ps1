@@ -4,15 +4,18 @@
 
 .DESCRIPTION
     Ensures prerequisites (Git, Python 3, Chocolatey) are installed, initializes submodules,
-    checks out correct branches, and runs dependency setup for the bot and RuneLite.
+    checks out correct branches, and installs PySide6. Java is provided by Gradle toolchains.
+    Use -Update to fetch and update submodules to latest main/master (for launcher to call).
 
 .EXAMPLE
     .\setup.ps1
     .\setup.ps1 -SkipPrereqs
+    .\setup.ps1 -Update
 #>
 
 param(
-    [switch]$SkipPrereqs
+    [switch]$SkipPrereqs,
+    [switch]$Update
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,6 +28,55 @@ function Write-Err   { Write-Host $args -ForegroundColor Red }
 $ScriptDir = $PSScriptRoot
 if (-not $ScriptDir) { $ScriptDir = Get-Location }
 
+$botPath = Join-Path $ScriptDir "bot_runelite_IL"
+$runelitePath = Join-Path $ScriptDir "runelite"
+
+# ---------------------------------------------------------------------------
+# -Update: fetch and update submodules to latest main/master only
+# ---------------------------------------------------------------------------
+if ($Update) {
+    Write-Info "=============================================="
+    Write-Info "  flez-bot - Update (fetch + submodule update)"
+    Write-Info "=============================================="
+    Write-Host ""
+    Push-Location $ScriptDir
+    try {
+        if (-not (Test-Path (Join-Path $ScriptDir ".git"))) {
+            Write-Err "Not a git repository. Run full setup first."
+            exit 1
+        }
+        Write-Info "Fetching from remotes..."
+        git fetch --all --tags --prune 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Warn "git fetch had issues (non-fatal)." }
+        Write-Info "Updating submodules to latest (main / master)..."
+        git submodule update --init --recursive --remote
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "Submodule update failed."
+            exit 1
+        }
+        $prevErr = $ErrorActionPreference
+        $ErrorActionPreference = "SilentlyContinue"
+        if (Test-Path $botPath) {
+            Push-Location $botPath
+            git checkout main 2>$null | Out-Null
+            Pop-Location
+        }
+        if (Test-Path $runelitePath) {
+            Push-Location $runelitePath
+            git checkout master 2>$null | Out-Null
+            Pop-Location
+        }
+        $ErrorActionPreference = $prevErr
+        Write-Success "Update complete."
+    } finally {
+        Pop-Location
+    }
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Full setup
+# ---------------------------------------------------------------------------
 Write-Info "=============================================="
 Write-Info "  flez-bot - Setup"
 Write-Info "=============================================="
@@ -62,7 +114,7 @@ if (-not $SkipPrereqs) {
     }
     Write-Success "  PowerShell: $($psVer)"
 
-    # Chocolatey (optional but recommended for installing Python/Java)
+    # Chocolatey (optional but recommended for installing Git/Python)
     $choco = Get-Command choco -ErrorAction SilentlyContinue
     if (-not $choco) {
         Write-Warn "  Chocolatey not found. Some dependencies may need manual install."
@@ -128,9 +180,6 @@ Write-Host ""
 # ---------------------------------------------------------------------------
 Write-Info "[3/6] Checking out branches..."
 
-$botPath = Join-Path $ScriptDir "bot_runelite_IL"
-$runelitePath = Join-Path $ScriptDir "runelite"
-
 # Git writes "Already on 'main'" to stderr; avoid that triggering Stop
 $prevErrorAction = $ErrorActionPreference
 $ErrorActionPreference = "SilentlyContinue"
@@ -177,10 +226,6 @@ if (-not (Test-Path (Join-Path $botPath "gui\launcher_pyside.py"))) {
     Write-Err "  bot_runelite_IL/gui/launcher_pyside.py not found."
     $ok = $false
 }
-if (-not (Test-Path (Join-Path $botPath "setup-dependencies.ps1"))) {
-    Write-Err "  bot_runelite_IL/setup-dependencies.ps1 not found."
-    $ok = $false
-}
 if (Test-Path $runelitePath) {
     if (-not (Test-Path (Join-Path $runelitePath "gradlew") -PathType Leaf) -and -not (Test-Path (Join-Path $runelitePath "gradlew.bat") -PathType Leaf)) {
         Write-Err "  runelite/gradlew or gradlew.bat not found."
@@ -195,19 +240,23 @@ Write-Success "  Directory structure OK."
 Write-Host ""
 
 # ---------------------------------------------------------------------------
-# 5. Run dependency setup (Java, Chocolatey, Maven) from bot repo
+# 5. Install Python GUI dependency (PySide6)
 # ---------------------------------------------------------------------------
-Write-Info "[5/6] Running bot dependency setup (Java, Maven, etc.)..."
-$depScript = Join-Path $botPath "setup-dependencies.ps1"
-if (Test-Path $depScript) {
-    & $depScript
+Write-Info "[5/6] Installing PySide6 (Python GUI)..."
+$pyExe = $null
+try { $pyExe = (Get-Command python -ErrorAction Stop).Source } catch {}
+if (-not $pyExe) {
+    try { $pyExe = (Get-Command py -ErrorAction Stop).Source } catch {}
+}
+if ($pyExe) {
+    & $pyExe -m pip install PySide6 --quiet
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "  Dependency script reported issues. You may need to install Java JDK 11 and Maven manually or run as Administrator."
+        Write-Warn "  pip install PySide6 failed. Try manually: python -m pip install PySide6"
     } else {
-        Write-Success "  Dependencies OK."
+        Write-Success "  PySide6 installed."
     }
 } else {
-    Write-Warn "  setup-dependencies.ps1 not found; skipping."
+    Write-Warn "  Python not found; skipping PySide6 install. Install Python and run: pip install PySide6"
 }
 Write-Host ""
 
@@ -222,10 +271,10 @@ Write-Success "=============================================="
 Write-Host ""
 Write-Info "Next steps:"
 Write-Info "  1. Add credentials to bot_runelite_IL/credentials/ (e.g. myaccount.properties)"
-Write-Info "  2. Run the launcher:"
-Write-Info "       cd bot_runelite_IL"
-Write-Info "       python gui_pyside.py"
+Write-Info "  2. Run the launcher from the flez-bot directory:"
+Write-Info "       python launcher.py"
+Write-Info "  (Or from anywhere: python path\to\flez-bot\launcher.py)"
 Write-Host ""
-Write-Info "To update submodules later:"
-Write-Info "  git submodule update --remote"
+Write-Info "To update repos to latest main/master:"
+Write-Info "  .\setup.ps1 -Update"
 Write-Host ""

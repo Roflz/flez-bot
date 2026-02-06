@@ -9,13 +9,12 @@ Umbrella repository that bundles the bot (bot_runelite_IL) and RuneLite (runelit
 git clone https://github.com/Roflz/flez-bot.git
 cd flez-bot
 
-# 2. Run setup (installs prerequisites if needed, inits submodules, runs dependency setup)
+# 2. Run setup (installs prerequisites if needed, inits submodules, installs PySide6)
 .\setup.ps1
 
-# 3. Add credentials and run the launcher
+# 3. Add credentials and run the launcher (from flez-bot root)
 # Add your .properties files to bot_runelite_IL\credentials\
-cd bot_runelite_IL
-python gui_pyside.py
+python launcher.py
 ```
 
 ## Requirements
@@ -23,8 +22,8 @@ python gui_pyside.py
 - **Windows** (PowerShell 5.1+)
 - **Git** – installed by setup if missing (via Chocolatey)
 - **Python 3** – installed by setup if missing (via Chocolatey)
-- **Java JDK 11** – installed by `setup-dependencies.ps1` (run by setup)
-- **Chocolatey** (recommended) – used to install Git, Python, Java; [install](https://chocolatey.org/install) as Administrator if needed
+- **Chocolatey** (recommended) – used to install Git, Python; [install](https://chocolatey.org/install) as Administrator if needed
+- **Java** – not required; Gradle toolchains auto-download JDK 11 when you build/launch RuneLite
 
 ## Repository layout
 
@@ -55,7 +54,7 @@ Then in each submodule you can `git pull` as usual.
 
 - **"Git not found"** – Install [Git](https://git-scm.com/) or run `choco install git -y` (as Administrator).
 - **"Python 3 not found"** – Install [Python 3](https://www.python.org/) or run `choco install python -y`.
-- **Java / Maven errors** – Run `bot_runelite_IL\setup-dependencies.ps1` as Administrator, or install [Java JDK 11](https://adoptium.net/) and [Maven](https://maven.apache.org/) manually.
+- **"Setup required" / runelite missing** – Run `.\setup.ps1` from the flez-bot directory. The GUI can also try to init submodules on first run.
 - **Submodules empty** – Run `git submodule update --init --recursive` from the umbrella repo root.
 
 ## For repository maintainers
