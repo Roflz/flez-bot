@@ -131,11 +131,15 @@ Write-Info "[3/6] Checking out branches..."
 $botPath = Join-Path $ScriptDir "bot_runelite_IL"
 $runelitePath = Join-Path $ScriptDir "runelite"
 
+# Git writes "Already on 'main'" to stderr; avoid that triggering Stop
+$prevErrorAction = $ErrorActionPreference
+$ErrorActionPreference = "SilentlyContinue"
+
 if (Test-Path $botPath) {
     Push-Location $botPath
     try {
-        git checkout main 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { git checkout -b main origin/main 2>&1 | Out-Null }
+        git checkout main 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { git checkout -b main origin/main 2>$null | Out-Null }
         Write-Success "  bot_runelite_IL: main"
     } finally { Pop-Location }
 } else {
@@ -145,12 +149,12 @@ if (Test-Path $botPath) {
 if (Test-Path $runelitePath) {
     Push-Location $runelitePath
     try {
-        git checkout master 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { git checkout -b master origin/master 2>&1 | Out-Null }
+        git checkout master 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { git checkout -b master origin/master 2>$null | Out-Null }
         # Ensure upstream remote exists for release checks
-        $upstream = git remote get-url upstream 2>&1
+        git remote get-url upstream 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            git remote add upstream https://github.com/runelite/runelite.git 2>&1 | Out-Null
+            git remote add upstream https://github.com/runelite/runelite.git 2>$null | Out-Null
             Write-Success "  runelite: master (upstream remote added)"
         } else {
             Write-Success "  runelite: master"
@@ -159,6 +163,8 @@ if (Test-Path $runelitePath) {
 } else {
     Write-Warn "  runelite directory not found (submodule may not be added yet)."
 }
+
+$ErrorActionPreference = $prevErrorAction
 Write-Host ""
 
 # ---------------------------------------------------------------------------
