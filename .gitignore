@@ -1,0 +1,13 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local / user-specific (do not ignore submodule dirs; they are tracked)
+*.local
+*.log

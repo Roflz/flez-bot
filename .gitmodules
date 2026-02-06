@@ -1,0 +1,8 @@
+[submodule "bot_runelite_IL"]
+	path = bot_runelite_IL
+	url = https://github.com/Roflz/IL_bot.git
+	branch = main
+[submodule "runelite"]
+	path = runelite
+	url = https://github.com/Roflz/runelite.git
+	branch = master
