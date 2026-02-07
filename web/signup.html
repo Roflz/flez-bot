@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign up — flez-bot</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .card {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 24px;
+      width: 100%;
+      max-width: 360px;
+    }
+    h1 { margin: 0 0 16px; font-size: 1.25rem; }
+    label { display: block; margin-bottom: 4px; color: #b0b0b0; font-size: 0.9rem; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border: 1px solid #4a4a4a;
+      border-radius: 6px;
+      background: #353535;
+      color: #fff;
+      font-size: 1rem;
+    }
+    input::placeholder { color: #888; }
+    button {
+      width: 100%;
+      padding: 10px 16px;
+      background: #2d6bb5;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:hover { background: #357abd; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .message { margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 0.9rem; }
+    .message.success { background: #1a3d1a; color: #9c9; }
+    .message.error { background: #3d1a1a; color: #c99; }
+    .message.info { background: #2a2a3a; color: #b0b0b0; }
+    a { color: #6ab; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Create account</h1>
+    <p style="color:#a0a0a0; margin:0 0 16px; font-size:0.9rem;">Sign up for flez-bot. After signing up, use the desktop app to sign in.</p>
+    <form id="signup-form">
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="you@example.com" required autocomplete="email">
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="••••••••" required minlength="6" autocomplete="new-password">
+      <label for="display">Display name (optional)</label>
+      <input id="display" type="text" placeholder="Your name" autocomplete="name">
+      <button type="submit" id="btn">Sign up</button>
+    </form>
+    <div id="message"></div>
+    <p style="margin-top:16px; font-size:0.85rem;"><a href="index.html">Back</a></p>
+    <p id="download-wrap" style="display:none; margin-top:12px; font-size:0.85rem;"><a href="#" id="download-link" style="color:#6ab;">Download setup.exe</a></p>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    (function() {
+      var url = window.FLEZ_BOT_DOWNLOAD_URL;
+      if (url && typeof url === 'string' && url.trim()) {
+        var wrap = document.getElementById('download-wrap');
+        var link = document.getElementById('download-link');
+        link.href = url.trim();
+        link.download = 'setup.exe';
+        wrap.style.display = 'block';
+      }
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    (function() {
+      var url = window.FLEZ_BOT_SUPABASE_URL;
+      var key = window.FLEZ_BOT_SUPABASE_ANON_KEY;
+      if (!url || !key || url.indexOf('YOUR_PROJECT') !== -1) {
+        document.getElementById('message').className = 'message error';
+        document.getElementById('message').textContent = 'Configure config.js with your Supabase URL and anon key (copy from config.example.js).';
+        return;
+      }
+      var supabase = window.supabase.createClient(url, key);
+
+      function show(msg, type) {
+        var el = document.getElementById('message');
+        el.className = 'message ' + (type || 'info');
+        el.textContent = msg;
+      }
+
+      document.getElementById('signup-form').onsubmit = async function(e) {
+        e.preventDefault();
+        var btn = document.getElementById('btn');
+        btn.disabled = true;
+        show('Creating account…', 'info');
+        var email = document.getElementById('email').value.trim();
+        var password = document.getElementById('password').value;
+        var display = document.getElementById('display').value.trim();
+        var options = { email: email, password: password };
+        if (display) options.options = { data: { full_name: display } };
+
+        var { data, error } = await supabase.auth.signUp(options);
+        btn.disabled = false;
+        if (error) {
+          show(error.message || 'Sign up failed.', 'error');
+          return;
+        }
+        if (data.user && !data.session) {
+          show('Account created. Check your email to confirm, then sign in from the flez-bot app.', 'success');
+        } else {
+          show('You\'re signed up. You can now sign in from the flez-bot desktop app.', 'success');
+        }
+      };
+    })();
+  </script>
+</body>
+</html>
