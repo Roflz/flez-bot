@@ -7,11 +7,15 @@ readiness check, then launches the PySide6 GUI. Intended for normal use and for
 packaging as flez-bot.exe (installer will run setup; launcher runs this flow).
 """
 
+import os
 import sys
 import subprocess
 from pathlib import Path
 
 def _flez_bot_root():
+    """Install root: directory containing the exe when frozen, else launcher.py's directory."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
 
 def _run_setup_update():
@@ -77,13 +81,27 @@ def _readiness_check():
 
     return len(missing) == 0, missing
 
+
+def _pause_if_frozen():
+    """If running as exe, pause so the user can read the console error."""
+    if getattr(sys, "frozen", False):
+        input("Press Enter to close...")
+
+
 def main():
     root = _flez_bot_root()
     bot_path = root / "bot_runelite_IL"
 
-    # 1. Update repos (setup.ps1 -Update)
+    # Ensure process working directory is the install root (fixes Start Menu / shortcut launch)
+    try:
+        os.chdir(str(root))
+    except OSError:
+        pass
+
+    # 1. Update repos (setup.ps1 -Update); non-blocking if it fails
     print("Checking for updates...")
-    _run_setup_update()
+    if not _run_setup_update():
+        print("Update check skipped or failed (e.g. no Git or network). Continuing.")
 
     # 2. Readiness check
     ok, missing = _readiness_check()
@@ -92,10 +110,12 @@ def main():
         print("Running full setup (this may take a few minutes)...")
         if not _run_setup_full():
             print("Setup failed. Run from the flez-bot directory: .\\setup.ps1")
+            _pause_if_frozen()
             sys.exit(1)
         ok, missing = _readiness_check()
         if not ok:
             print("Still missing:", ", ".join(missing))
+            _pause_if_frozen()
             sys.exit(1)
 
     # 3. Launch GUI (add bot_runelite_IL to path and run its entry point)
@@ -103,5 +123,11 @@ def main():
     import gui_pyside
     gui_pyside.main()
 
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print("Error:", e)
+        _pause_if_frozen()
+        raise
