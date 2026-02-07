@@ -82,15 +82,35 @@ def _readiness_check():
     return len(missing) == 0, missing
 
 
-def _pause_if_frozen():
-    """If running as exe, pause so the user can read the console error."""
-    if getattr(sys, "frozen", False):
+def _pause_if_frozen(message=None):
+    """If running as exe, pause so the user can read the error. When no console (GUI launch), show a message box."""
+    if not getattr(sys, "frozen", False):
+        return
+    text = message or "An error occurred."
+    # When console=False, stdin is not available; use a message box on Windows instead of input()
+    try:
+        if sys.stdin is None or getattr(sys.stdin, "closed", True):
+            raise RuntimeError("no stdin")
         input("Press Enter to close...")
+    except (RuntimeError, OSError):
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(0, text, "flez-bot", 0x10)  # MB_ICONHAND
+            except Exception:
+                pass
 
 
 def main():
     root = _flez_bot_root()
     bot_path = root / "bot_runelite_IL"
+
+    # Load .env from project root so SUPABASE_URL / SUPABASE_ANON_KEY etc. are set
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(root / ".env")
+    except ImportError:
+        pass
 
     # Ensure process working directory is the install root (fixes Start Menu / shortcut launch)
     try:
@@ -109,13 +129,15 @@ def main():
         print("Setup incomplete:", ", ".join(missing))
         print("Running full setup (this may take a few minutes)...")
         if not _run_setup_full():
-            print("Setup failed. Run from the flez-bot directory: .\\setup.ps1")
-            _pause_if_frozen()
+            msg = "Setup failed. Run from the flez-bot directory: .\\setup.ps1"
+            print(msg)
+            _pause_if_frozen(msg)
             sys.exit(1)
         ok, missing = _readiness_check()
         if not ok:
-            print("Still missing:", ", ".join(missing))
-            _pause_if_frozen()
+            msg = "Still missing: " + ", ".join(missing)
+            print(msg)
+            _pause_if_frozen(msg)
             sys.exit(1)
 
     # 3. Launch GUI (add bot_runelite_IL to path and run its entry point)
@@ -128,6 +150,7 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print("Error:", e)
-        _pause_if_frozen()
+        err_msg = str(e)
+        print("Error:", err_msg)
+        _pause_if_frozen("Error: " + err_msg)
         raise

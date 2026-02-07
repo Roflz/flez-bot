@@ -9,6 +9,8 @@ For end users, installation is two steps:
 1. **Run `flez-bot-setup-0.1.0.exe`** (or the current setup exe from releases). The installer will install Git and Python if needed, copy the app, run setup, and create a Start Menu shortcut.
 2. **Run flez-bot** — double-click `flez-bot.exe` in the install folder, or use the Start Menu shortcut. No further setup required.
 
+**Upgrading:** Running a newer setup.exe and choosing the default install folder (`%LOCALAPPDATA%\flez-bot`) will overwrite the previous installation. Users do not need to uninstall first.
+
 The rest of this document is for maintainers who build the installer and launcher exe.
 
 ## Install layout
@@ -75,6 +77,20 @@ The installer:
      iscc /DBUNDLE_DIR=dist\flez-bot-bundle installer.iss
      ```
 4. Output is **`dist/flez-bot-setup-0.1.0.exe`** (version from `installer.iss`).
+
+## Quick test (after first install)
+
+Once you’ve run the setup exe at least once, you can rebuild and test the launcher **without rebuilding the installer**:
+
+From the flez-bot repo root:
+
+```powershell
+.\build-and-test.ps1
+```
+
+This builds `flez-bot.exe`, copies it to the repo root and to `%LOCALAPPDATA%\flez-bot\` (if that folder exists), and launches the app. Use this loop when fixing exe-only issues (e.g. missing hiddenimports). Use `-NoLaunch` to build and copy without starting the app.
+
+When you’re ready to produce a new setup exe for release, run the full flow below (including `iscc installer.iss`).
 
 ## How to test (full flow)
 

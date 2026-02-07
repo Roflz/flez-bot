@@ -20,6 +20,9 @@ a = Analysis(
         'PySide6.QtWidgets',
         'pkgutil',   # used by plan discovery (bot_runelite_IL loaded from disk)
         'psutil',    # used by client_detector_pyside
+        'urllib.request',  # used by home_tab_pyside (loaded from disk)
+        'urllib.parse',
+        'webbrowser',  # used by login_dialog_pyside (loaded from disk)
     ],
     hookspath=[],
     hooksconfig={},
