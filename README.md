@@ -4,6 +4,10 @@ Umbrella repository that bundles the bot (bot_runelite_IL) and RuneLite (runelit
 
 ## Quick start
 
+**If you have the installer** (e.g. from releases): run `flez-bot-setup-*.exe`, then launch **flez-bot.exe** (or use the Start Menu shortcut). See [PACKAGING.md](PACKAGING.md#end-user-installation) for details.
+
+**From source:**
+
 ```powershell
 # 1. Clone the umbrella repo
 git clone https://github.com/Roflz/flez-bot.git
