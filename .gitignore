@@ -14,9 +14,6 @@ Thumbs.db
 .env
 .env.local
 
-# Web site config (contains Supabase anon key - optional, keep private)
-web/config.js
-
 # Bundled installers (run installer_deps\download-installers.ps1 to fetch)
 installer_deps/*.exe
 
