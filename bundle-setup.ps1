@@ -1,5 +1,9 @@
-# Build flez-bot-setup-*.exe: launcher exe, bundled Git/Python installers, then Inno Setup.
+# Build setup.exe: launcher exe, bundled Git/Python installers, then Inno Setup.
 # Run from flez-bot repo root: .\bundle-setup.ps1
+
+param(
+    [switch]$ForceInstallerDownload
+)
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
@@ -24,9 +28,13 @@ Write-Host "  flez-bot.exe copied to repo root." -ForegroundColor Green
 Write-Host ""
 
 Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host "  Step 2/4: Download Git and Python installers" -ForegroundColor Cyan
+Write-Host "  Step 2/4: Ensure Git and Python installers" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
-& "$root\installer_deps\download-installers.ps1"
+if ($ForceInstallerDownload) {
+    & "$root\installer_deps\download-installers.ps1" -ForceDownload
+} else {
+    & "$root\installer_deps\download-installers.ps1"
+}
 if ($LASTEXITCODE -ne 0) { throw "Download installers failed." }
 Write-Host ""
 
@@ -37,4 +45,4 @@ Write-Host "==============================================" -ForegroundColor Cya
 if ($LASTEXITCODE -ne 0) { throw "iscc failed." }
 Write-Host ""
 
-Write-Host "Done. Setup exe: dist\flez-bot-setup-0.1.0.exe" -ForegroundColor Green
+Write-Host "Done. Setup exe: dist\setup.exe" -ForegroundColor Green

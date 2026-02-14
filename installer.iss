@@ -21,17 +21,18 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={localappdata}\{#MyAppName}
+DefaultDirName={code:GetDefaultInstallDir}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=flez-bot-setup-{#MyAppVersion}
+OutputBaseFilename=setup
 SetupIconFile=packaging\icon.ico
 UninstallDisplayIcon={app}\flez-bot.exe
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
+PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
@@ -50,11 +51,14 @@ Source: "{#BUNDLE_DIR}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Run]
 ; Install Git if not present (bundled installer).
-Filename: "{tmp}\GitInstaller.exe"; Parameters: "/VERYSILENT /NORESTART /o:PathOption=Cmd"; StatusMsg: "Installing Git (if needed)..."; Check: GitNeeded; Flags: runhidden waituntilterminated
+Filename: "{tmp}\GitInstaller.exe"; Parameters: "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES /SP- /o:PathOption=Cmd"; StatusMsg: "Checking/installing Git..."; Check: GitNeeded; Flags: waituntilterminated logoutput
+Filename: "cmd.exe"; Parameters: "/c (git --version) || (""%LocalAppData%\Programs\Git\cmd\git.exe"" --version) || (""%ProgramFiles%\Git\cmd\git.exe"" --version) || (""%ProgramFiles(x86)%\Git\cmd\git.exe"" --version)"; StatusMsg: "Verifying Git installation..."; Flags: runhidden waituntilterminated logoutput
 ; Install Python 3.13 if not present (bundled installer).
-Filename: "{tmp}\PythonInstaller.exe"; Parameters: "/quiet InstallAllUsers=0 PrependPath=1"; StatusMsg: "Installing Python (if needed)..."; Check: PythonNeeded; Flags: runhidden waituntilterminated
+Filename: "{tmp}\PythonInstaller.exe"; Parameters: "/quiet InstallAllUsers=1 PrependPath=1 Include_launcher=1 Include_pip=1 Include_test=0"; StatusMsg: "Checking/installing Python (all users)..."; Check: PythonNeededAllUsers; Flags: waituntilterminated logoutput
+Filename: "{tmp}\PythonInstaller.exe"; Parameters: "/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 Include_pip=1 Include_test=0"; StatusMsg: "Checking/installing Python (current user)..."; Check: PythonNeededCurrentUser; Flags: waituntilterminated logoutput
+Filename: "cmd.exe"; Parameters: "/c (python --version) || (""%LocalAppData%\Programs\Python\Python313\python.exe"" --version) || (""%ProgramFiles%\Python313\python.exe"" --version) || (""%ProgramFiles(x86)%\Python313\python.exe"" --version)"; StatusMsg: "Verifying Python installation..."; Flags: runhidden waituntilterminated logoutput
 ; Run full setup (submodules, PySide6). Use refreshed PATH so newly installed Git/Python are found.
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -Command ""$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); & '{app}\setup.ps1'"""; StatusMsg: "Running setup (submodules, PySide6)..."; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -Command ""$logDir = Join-Path '{app}' 'logs'; New-Item -ItemType Directory -Force -Path $logDir | Out-Null; $setupLog = Join-Path $logDir 'installer-setup.log'; $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User') + ';' + (Join-Path $env:LocalAppData 'Programs\Git\cmd') + ';' + (Join-Path ${env:ProgramFiles} 'Git\cmd') + ';' + (Join-Path ${env:ProgramFiles(x86)} 'Git\cmd'); & '{app}\setup.ps1' 2>&1 | Tee-Object -FilePath $setupLog; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"""; StatusMsg: "Running app setup (repos + dependencies)..."; Flags: waituntilterminated logoutput
 
 [Icons]
 ; Start Menu and Desktop: Target = full path to exe, WorkingDir = install dir so launch works reliably.
@@ -68,6 +72,14 @@ Name: "{autodesktop}\{#MyAppName}.lnk"; Filename: "python"; Parameters: "launche
 function LauncherExeExists: Boolean;
 begin
   Result := FileExists(ExpandConstant('{app}\flez-bot.exe'));
+end;
+
+function GetDefaultInstallDir(Value: string): string;
+begin
+  if IsAdminInstallMode then
+    Result := ExpandConstant('{autopf}\{#MyAppName}')
+  else
+    Result := ExpandConstant('{localappdata}\{#MyAppName}');
 end;
 
 function LauncherExeMissing: Boolean;
@@ -86,17 +98,29 @@ end;
 function GitInstalled: Boolean;
 var
   ExitCode: Integer;
+  UserGit: string;
+  MachineGit: string;
 begin
-  Result := RunCommand('cmd.exe', '/c git --version', ExitCode) and (ExitCode = 0);
+  UserGit := ExpandConstant('{localappdata}\Programs\Git\cmd\git.exe');
+  MachineGit := ExpandConstant('{autopf}\Git\cmd\git.exe');
+  Result :=
+    ((RunCommand('cmd.exe', '/c git --version', ExitCode) and (ExitCode = 0)) or
+    FileExists(UserGit) or FileExists(MachineGit));
 end;
 
 function PythonInstalled: Boolean;
 var
   ExitCode: Integer;
+  UserPy: string;
+  MachinePy: string;
 begin
+  UserPy := ExpandConstant('{localappdata}\Programs\Python\Python313\python.exe');
+  MachinePy := ExpandConstant('{autopf}\Python313\python.exe');
   if RunCommand('cmd.exe', '/c python --version', ExitCode) and (ExitCode = 0) then
     Result := True
   else if RunCommand('cmd.exe', '/c py -3 -c ""exit(0)""', ExitCode) and (ExitCode = 0) then
+    Result := True
+  else if FileExists(UserPy) or FileExists(MachinePy) then
     Result := True
   else
     Result := False;
@@ -112,9 +136,29 @@ begin
   Result := not PythonInstalled;
 end;
 
+function PythonNeededAllUsers: Boolean;
+begin
+  Result := PythonNeeded and IsAdminInstallMode;
+end;
+
+function PythonNeededCurrentUser: Boolean;
+begin
+  Result := PythonNeeded and (not IsAdminInstallMode);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  SetupLog: string;
 begin
   if CurStep = ssPostInstall then
     if DirExists(ExpandConstant('{app}\installer_deps')) then
       DelTree(ExpandConstant('{app}\installer_deps'), True, True, True);
+  if CurStep = ssDone then begin
+    SetupLog := ExpandConstant('{app}\logs\installer-setup.log');
+    if FileExists(SetupLog) then
+      MsgBox(
+        'Install complete. Setup details were logged to:' + #13#10 + SetupLog,
+        mbInformation, MB_OK
+      );
+  end;
 end;

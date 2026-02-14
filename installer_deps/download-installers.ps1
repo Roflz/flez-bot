@@ -1,5 +1,10 @@
 # Downloads official Git and Python installers into this folder for bundling in setup.exe.
 # Run from repo root: .\installer_deps\download-installers.ps1
+# Existing installer files are reused by default; use -ForceDownload to refresh.
+
+param(
+    [switch]$ForceDownload
+)
 
 $ErrorActionPreference = "Stop"
 $depsDir = $PSScriptRoot
@@ -12,11 +17,34 @@ $gitOut = Join-Path $depsDir "GitInstaller.exe"
 $pythonUrl = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe"
 $pythonOut = Join-Path $depsDir "PythonInstaller.exe"
 
-Write-Host "Downloading Git for Windows..."
-Invoke-WebRequest -Uri $gitUrl -OutFile $gitOut -UseBasicParsing
+function Ensure-InstallerFile {
+    param(
+        [string]$Label,
+        [string]$Url,
+        [string]$OutFilePath
+    )
 
-Write-Host "Downloading Python 3.13..."
-Invoke-WebRequest -Uri $pythonUrl -OutFile $pythonOut -UseBasicParsing
+    $sourceMarker = "$OutFilePath.source-url.txt"
+    $hasMatchingSource = $false
+    if ((Test-Path $OutFilePath) -and (Test-Path $sourceMarker)) {
+        $existingSource = (Get-Content -Path $sourceMarker -Raw -ErrorAction SilentlyContinue).Trim()
+        if ($existingSource -eq $Url) {
+            $hasMatchingSource = $true
+        }
+    }
+
+    if ((-not $ForceDownload) -and $hasMatchingSource) {
+        Write-Host "$Label installer already present and up to date, reusing: $OutFilePath"
+        return
+    }
+
+    Write-Host "Downloading $Label installer..."
+    Invoke-WebRequest -Uri $Url -OutFile $OutFilePath -UseBasicParsing
+    Set-Content -Path $sourceMarker -Value $Url -Encoding ASCII
+}
+
+Ensure-InstallerFile -Label "Git for Windows" -Url $gitUrl -OutFilePath $gitOut
+Ensure-InstallerFile -Label "Python 3.13" -Url $pythonUrl -OutFilePath $pythonOut
 
 Write-Host "Done. GitInstaller.exe and PythonInstaller.exe are in installer_deps."
 Write-Host "You can now run: iscc installer.iss (or iscc /DBUNDLE_DIR=dist\flez-bot-bundle installer.iss)"

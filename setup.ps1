@@ -41,6 +41,82 @@ $runelitePath = Join-Path $ScriptDir "runelite"
 
 $runAll = -not ($UpdateRepos -or $MergeRuneliteUpstream -or ($InstallDep.Count -gt 0))
 
+function Resolve-ToolPath {
+    param(
+        [string]$CommandName,
+        [string[]]$FallbackPaths
+    )
+    try {
+        $cmd = Get-Command $CommandName -ErrorAction Stop
+        if ($cmd -and $cmd.Source) {
+            return $cmd.Source
+        }
+    } catch {}
+    foreach ($candidate in $FallbackPaths) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return $candidate
+        }
+    }
+    return $null
+}
+
+function Add-DirToPathIfMissing {
+    param([string]$DirPath)
+    if (-not $DirPath) { return }
+    if (-not (Test-Path $DirPath)) { return }
+    $parts = @($env:Path -split ";" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $exists = $false
+    foreach ($p in $parts) {
+        if ($p.TrimEnd("\") -ieq $DirPath.TrimEnd("\")) {
+            $exists = $true
+            break
+        }
+    }
+    if (-not $exists) {
+        $env:Path = $env:Path + ";" + $DirPath
+    }
+}
+
+function Initialize-ToolPaths {
+    $global:GitExe = Resolve-ToolPath -CommandName "git" -FallbackPaths @(
+        (Join-Path $env:LocalAppData "Programs\Git\cmd\git.exe"),
+        (Join-Path ${env:ProgramFiles} "Git\cmd\git.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Git\cmd\git.exe")
+    )
+    if ($global:GitExe) {
+        Add-DirToPathIfMissing (Split-Path $global:GitExe -Parent)
+    }
+
+    $global:PythonExe = Resolve-ToolPath -CommandName "python" -FallbackPaths @(
+        (Join-Path $env:LocalAppData "Programs\Python\Python313\python.exe"),
+        (Join-Path ${env:ProgramFiles} "Python313\python.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Python313\python.exe")
+    )
+    if ($global:PythonExe) {
+        Add-DirToPathIfMissing (Split-Path $global:PythonExe -Parent)
+    }
+}
+
+function Ensure-RequiredTools {
+    param(
+        [bool]$NeedGit,
+        [bool]$NeedPython
+    )
+    if ($NeedGit -and -not $global:GitExe) {
+        Write-Err "Git is required but was not found."
+        Write-Err "Install path checked: $env:LocalAppData\Programs\Git\cmd\git.exe and Program Files Git paths."
+        exit 1
+    }
+    if ($NeedPython -and -not $global:PythonExe) {
+        Write-Err "Python is required but was not found."
+        Write-Err "Install path checked: $env:LocalAppData\Programs\Python\Python313\python.exe and Program Files Python paths."
+        exit 1
+    }
+}
+
+Initialize-ToolPaths
+Ensure-RequiredTools -NeedGit ($Update -or $runAll -or $UpdateRepos -or $MergeRuneliteUpstream) -NeedPython ($runAll -or ($InstallDep.Count -gt 0))
+
 # ---------------------------------------------------------------------------
 # -Update: fetch and update submodules
 # ---------------------------------------------------------------------------
@@ -159,11 +235,9 @@ if ($runAll) {
 }
 
 if ($depsToInstall.Count -gt 0) {
-    $pyExe = $null
-    try { $pyExe = (Get-Command python -ErrorAction Stop).Source } catch {}
-    if (-not $pyExe) { try { $pyExe = (Get-Command py -ErrorAction Stop).Source } catch {} }
+    $pyExe = $global:PythonExe
     if (-not $pyExe) {
-        Write-Err "Python not found. Run setup with -InstallPython first."
+        Write-Err "Python not found."
         exit 1
     }
     $env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
