@@ -13,6 +13,9 @@ Thumbs.db
 *.log
 .env
 .env.local
+flez_bot_auth_debug.log
+__pycache__/
+*.pyc
 
 # Bundled installers (run installer_deps\download-installers.ps1 to fetch)
 installer_deps/*.exe
