@@ -1,8 +1,9 @@
-# Build setup.exe: launcher exe, bundled Git/Python installers, then Inno Setup.
+# Build setup.exe: launcher exe, release artifacts, then Inno Setup bootstrap installer.
 # Run from flez-bot repo root: .\bundle-setup.ps1
 
 param(
-    [switch]$ForceInstallerDownload
+    [string]$Channel = "alpha",
+    [string]$ReleaseBaseUrl = "https://github.com/Roflz/flez-bot/releases/download/latest"
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,14 +29,10 @@ Write-Host "  flez-bot.exe copied to repo root." -ForegroundColor Green
 Write-Host ""
 
 Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host "  Step 2/4: Ensure Git and Python installers" -ForegroundColor Cyan
+Write-Host "  Step 2/4: Build app-full release artifacts" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
-if ($ForceInstallerDownload) {
-    & "$root\installer_deps\download-installers.ps1" -ForceDownload
-} else {
-    & "$root\installer_deps\download-installers.ps1"
-}
-if ($LASTEXITCODE -ne 0) { throw "Download installers failed." }
+& "$root\build-release-artifacts.ps1" -Channel $Channel -ReleaseBaseUrl $ReleaseBaseUrl
+if ($LASTEXITCODE -ne 0) { throw "build-release-artifacts.ps1 failed." }
 Write-Host ""
 
 Write-Host "==============================================" -ForegroundColor Cyan

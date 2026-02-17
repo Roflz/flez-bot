@@ -1,76 +1,67 @@
 # flez-bot
 
-Umbrella repository that bundles the bot (bot_runelite_IL) and RuneLite (runelite) as Git submodules for a single clone-and-run setup.
+This repository ships a bootstrap installer + launcher for a packaged `flez-bot` runtime.
 
-## Quick start
+## Product contract (implemented)
 
-**If you have the installer** (e.g. from releases): run `flez-bot-setup-*.exe`, then launch **flez-bot.exe** (or use the Start Menu shortcut). See [PACKAGING.md](PACKAGING.md#end-user-installation) for details.
+- No `setup.ps1` workflow in packaged or developer mode.
+- Installer only:
+  - places bootstrap files
+  - downloads/verifies release artifact
+  - installs to `app_live`
+  - creates shortcuts
+  - writes install logs
+- Launcher only:
+  - validates required packaged files
+  - checks/stages updates each launch
+  - applies staged updates on restart decision
+  - launches app
+- Updater only:
+  - stages/downloads full bundle
+  - applies atomic swap with backup
+  - rolls back on failed healthcheck
 
-**From source:**
+## Install layout
 
-```powershell
-# 1. Clone the umbrella repo
-git clone https://github.com/Roflz/flez-bot.git
-cd flez-bot
+Installed root layout:
 
-# 2. Run setup (installs prerequisites if needed, inits submodules, installs PySide6)
-.\setup.ps1
+- `app_live/`
+- `app_stage/`
+- `app_backup/`
+- `state/`
+- `logs/`
+- `cache/`
+- `data/`
+- `tmp/`
 
-# 3. Add credentials and run the launcher (from flez-bot root)
-# Add your .properties files to bot_runelite_IL\credentials\
-python launcher.py
-```
+## Build
 
-## Requirements
-
-- **Windows** (PowerShell 5.1+)
-- **Git** – installed by setup if missing (via Chocolatey)
-- **Python 3** – installed by setup if missing (via Chocolatey)
-- **Chocolatey** (recommended) – used to install Git, Python; [install](https://chocolatey.org/install) as Administrator if needed
-- **Java** – not required; Gradle toolchains auto-download JDK 11 when you build/launch RuneLite
-
-## Repository layout
-
-```
-flez-bot/
-├── setup.ps1              # Run this first
-├── README.md
-├── .gitmodules
-├── bot_runelite_IL/       # Submodule (branch: main)
-└── runelite/              # Submodule (branch: master, your fork)
-```
-
-- **bot_runelite_IL**: Bot GUI, plans, and launcher logic. Branch: `main`.
-- **runelite**: Your RuneLite fork. Branch: `master`. The launcher fetches upstream releases when you launch instances.
-
-## Updating submodules
-
-To pull the latest bot and runelite changes:
+Use:
 
 ```powershell
-git submodule update --remote
-git submodule update --init --recursive
+.\bundle-setup.ps1
 ```
 
-Then in each submodule you can `git pull` as usual.
+This runs:
 
-## Troubleshooting
+1. icon generation
+2. launcher exe build
+3. release artifact build (`app-full.zip`, `manifest.json`, `.sha256`)
+4. Inno Setup build (`dist\setup.exe`)
 
-- **"Git not found"** – Install [Git](https://git-scm.com/) or run `choco install git -y` (as Administrator).
-- **"Python 3 not found"** – Install [Python 3](https://www.python.org/) or run `choco install python -y`.
-- **"Setup required" / runelite missing** – Run `.\setup.ps1` from the flez-bot directory. The GUI can also try to init submodules on first run.
-- **Submodules empty** – Run `git submodule update --init --recursive` from the umbrella repo root.
+## Release artifacts
 
-## For repository maintainers
+Required release assets:
 
-One-time setup of this umbrella repo (already done for this repo):
+- `app-full.zip`
+- `app-full.zip.sha256`
+- `manifest.json`
+- `manifest.json.sha256`
 
-1. Create GitHub repo `flez-bot` (e.g. with a README).
-2. Clone it, then add submodules:
-   ```powershell
-   git clone https://github.com/Roflz/flez-bot.git
-   cd flez-bot
-   git submodule add -b main https://github.com/Roflz/bot_runelite_IL.git bot_runelite_IL
-   git submodule add -b master https://github.com/Roflz/runelite.git runelite
-   ```
-3. Add `setup.ps1`, `README.md`, `.gitignore` (and this README), then commit and push.
+Publish order: artifact(s) first, `manifest.json` last.
+
+## Logs
+
+- Installer: `logs\install.log`
+- Launcher: `logs\launcher_YYYYMMDD_HHMMSS.log`
+- Updater: `logs\updater_YYYYMMDD_HHMMSS.log`

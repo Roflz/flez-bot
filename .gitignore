@@ -19,6 +19,7 @@ __pycache__/
 
 # Bundled installers (run installer_deps\download-installers.ps1 to fetch)
 installer_deps/*.exe
+installer_deps/*.source-url.txt
 
 # Build output (run bundle-setup.ps1 or pyinstaller / iscc)
 build/
