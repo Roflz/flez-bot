@@ -86,7 +86,7 @@ def _load_state(root: Path, logger: logging.Logger) -> dict:
         _save_state(root, state)
         return state
     try:
-        state = json.loads(sp.read_text(encoding="utf-8"))
+        state = json.loads(sp.read_text(encoding="utf-8-sig"))
         if not isinstance(state, dict):
             raise ValueError("state.json is not an object")
         return state
@@ -113,7 +113,7 @@ def _validate_app_dir(app_dir: Path) -> tuple[bool, str]:
         if not path.exists():
             return False, f"required file missing: {path}"
     try:
-        data = json.loads((app_dir / "version.json").read_text(encoding="utf-8"))
+        data = json.loads((app_dir / "version.json").read_text(encoding="utf-8-sig"))
         if not data.get("version"):
             return False, "version.json missing version"
     except Exception as exc:
@@ -158,12 +158,40 @@ def _run_updater(root: Path, mode: str, channel: str, logger: logging.Logger) ->
         return False, str(exc)
 
 
+def _run_updater_background(root: Path, mode: str, channel: str, logger: logging.Logger) -> tuple[bool, str]:
+    updater = root / "updater.py"
+    if not updater.exists():
+        return False, "updater.py not found"
+    python_exe = root / "app_live" / "runtime" / "python" / "python.exe"
+    if not python_exe.exists():
+        resolved = shutil.which("python")
+        if not resolved:
+            return False, "python runtime unavailable for updater"
+        python_exe = Path(resolved)
+    cmd = [str(python_exe), str(updater), "--root", str(root), "--channel", channel, "--mode", mode]
+    try:
+        kwargs: dict = {
+            "cwd": str(root),
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+            "stdin": subprocess.DEVNULL,
+            "start_new_session": True,
+        }
+        if sys.platform == "win32":
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+        p = subprocess.Popen(cmd, **kwargs)
+        logger.info("updater background cmd (pid=%s): %s", p.pid, " ".join(cmd))
+        return True, "started"
+    except Exception as exc:
+        return False, str(exc)
+
+
 def _read_live_version(paths: dict[str, Path]) -> str:
     version_file = paths["live"] / "version.json"
     if not version_file.exists():
         return "0.0.0"
     try:
-        data = json.loads(version_file.read_text(encoding="utf-8"))
+        data = json.loads(version_file.read_text(encoding="utf-8-sig"))
         return str(data.get("version", "0.0.0"))
     except Exception:
         return "0.0.0"
@@ -249,6 +277,12 @@ def main() -> int:
             _health_marker(root, version)
             state["status"] = STATUS_IDLE
             state["currentVersion"] = version
+            state["targetVersion"] = None
+            state["artifact"] = None
+            attempts = state.setdefault("attempts", {})
+            attempts["applyCount"] = 0
+            attempts["rollbackCount"] = 0
+            state["lastError"] = None
             _save_state(root, state)
             logger.info("Previous applied version passed healthcheck: %s", version)
         else:
@@ -289,29 +323,31 @@ def main() -> int:
                 log_path,
             )
 
-    # Per-launch update check and stage.
-    stage_ok, stage_detail = _run_updater(root, "check-stage", channel, logger)
-    if not stage_ok:
-        logger.warning(
-            "RESULT: FAILED | reason=%s | action=continue_with_current_version",
-            stage_detail,
-        )
-    else:
-        state = _load_state(root, logger)
-        if state.get("status") == STATUS_DOWNLOADED_STAGED:
-            logger.info("Staged update detected.")
-            if _prompt_restart_now():
-                logger.info("User chose restart now; applying staged update.")
-                apply_ok, apply_detail = _run_updater(root, "apply", channel, logger)
-                if not apply_ok:
-                    logger.error(
-                        "RESULT: FAILED | reason=%s | action=continue_with_current_version",
-                        apply_detail,
-                    )
-                else:
-                    logger.info("Update applied; launching updated app.")
+    # If a staged update already exists, prompt immediately. Otherwise stage in background.
+    state = _load_state(root, logger)
+    if state.get("status") == STATUS_DOWNLOADED_STAGED:
+        logger.info("Staged update detected.")
+        if _prompt_restart_now():
+            logger.info("User chose restart now; applying staged update.")
+            apply_ok, apply_detail = _run_updater(root, "apply", channel, logger)
+            if not apply_ok:
+                logger.error(
+                    "RESULT: FAILED | reason=%s | action=continue_with_current_version",
+                    apply_detail,
+                )
             else:
-                logger.info("User chose Later for staged update.")
+                logger.info("Update applied; launching updated app.")
+        else:
+            logger.info("User chose Later for staged update.")
+    else:
+        stage_started, stage_detail = _run_updater_background(root, "check-stage", channel, logger)
+        if not stage_started:
+            logger.warning(
+                "RESULT: FAILED | reason=%s | action=continue_with_current_version",
+                stage_detail,
+            )
+        else:
+            logger.info("Background update check started.")
 
     # Mark health for the currently running live version.
     version = _read_live_version(paths)
@@ -320,6 +356,12 @@ def main() -> int:
     if state.get("status") in (STATUS_ROLLED_BACK, STATUS_APPLIED_PENDING_HEALTHCHECK):
         state["status"] = STATUS_IDLE
         state["currentVersion"] = version
+        state["targetVersion"] = None
+        state["artifact"] = None
+        attempts = state.setdefault("attempts", {})
+        attempts["applyCount"] = 0
+        attempts["rollbackCount"] = 0
+        state["lastError"] = None
         _save_state(root, state)
     logger.info("Launching app_live version: %s", version)
     _launch_live(paths, logger)

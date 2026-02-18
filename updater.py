@@ -125,7 +125,7 @@ def load_state(root: Path, channel: str, logger: logging.Logger) -> dict:
         save_state(root, state)
         return state
     try:
-        state = json.loads(sp.read_text(encoding="utf-8"))
+        state = json.loads(sp.read_text(encoding="utf-8-sig"))
         if not isinstance(state, dict):
             raise ValueError("state.json is not an object")
         if "status" not in state:
@@ -156,7 +156,7 @@ def read_installed_version(live_dir: Path) -> str:
     if not version_file.exists():
         return "0.0.0"
     try:
-        data = json.loads(version_file.read_text(encoding="utf-8"))
+        data = json.loads(version_file.read_text(encoding="utf-8-sig"))
         return str(data.get("version", "0.0.0"))
     except Exception:
         return "0.0.0"
@@ -229,7 +229,7 @@ def validate_app_dir(app_dir: Path) -> tuple[bool, str]:
         if not path.exists():
             return False, f"missing required path: {path}"
     try:
-        data = json.loads((app_dir / "version.json").read_text(encoding="utf-8"))
+        data = json.loads((app_dir / "version.json").read_text(encoding="utf-8-sig"))
         if not data.get("version"):
             return False, "version.json missing version field"
     except Exception as exc:
@@ -260,6 +260,20 @@ def stage_latest(root: Path, channel: str, logger: logging.Logger) -> tuple[bool
     save_state(root, state)
     logger.info("Current installed version: %s", current_version)
 
+    staged_target = str(state.get("targetVersion") or "").strip()
+    if state.get("status") == STATUS_DOWNLOADED_STAGED and staged_target:
+        if is_newer_version(staged_target, current_version):
+            logger.info("Existing staged update detected for version %s; skipping re-stage.", staged_target)
+            return True, "staged"
+        state["status"] = STATUS_IDLE
+        state["targetVersion"] = None
+        state["artifact"] = None
+        state["lastError"] = None
+        attempts = state.setdefault("attempts", {})
+        attempts["applyCount"] = 0
+        attempts["rollbackCount"] = 0
+        save_state(root, state)
+
     try:
         releases = fetch_releases(logger)
         release = select_release_for_channel(releases, channel=channel)
@@ -277,7 +291,7 @@ def stage_latest(root: Path, channel: str, logger: logging.Logger) -> tuple[bool
 
         manifest_path = paths["cache"] / MANIFEST_ASSET_NAME
         download_file(manifest_asset["browser_download_url"], manifest_path, logger)
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
 
         artifact = None
         for item in manifest.get("artifacts", []):
@@ -315,6 +329,9 @@ def stage_latest(root: Path, channel: str, logger: logging.Logger) -> tuple[bool
             "sizeBytes": artifact.get("sizeBytes", 0),
         }
         state["lastError"] = None
+        attempts = state.setdefault("attempts", {})
+        attempts["applyCount"] = 0
+        attempts["rollbackCount"] = 0
         save_state(root, state)
         return True, "staged"
     except urllib.error.URLError as exc:
@@ -328,7 +345,7 @@ def apply_staged_update(root: Path, channel: str, logger: logging.Logger) -> tup
     state = load_state(root, channel=channel, logger=logger)
     if state.get("status") != STATUS_DOWNLOADED_STAGED:
         return True, result_skipped("no staged update present", "keep_current_version")
-    if int(state.get("attempts", {}).get("applyCount", 0)) >= 1:
+    if int(state.get("attempts", {}).get("applyCount", 0)) >= 3:
         state["status"] = STATUS_FAILED_REQUIRES_REINSTALL
         state["lastError"] = "apply loop protection triggered (max apply attempts reached)"
         save_state(root, state)

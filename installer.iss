@@ -2,7 +2,9 @@
 ; Installs bootstrap launcher/updater/runtime scripts only, then downloads app artifact.
 
 #define MyAppName "flez-bot"
+#ifndef MyAppVersion
 #define MyAppVersion "0.1.0"
+#endif
 #define MyAppPublisher "flez-bot"
 #define MyAppURL "https://github.com/Roflz/flez-bot"
 
@@ -18,7 +20,7 @@ DefaultDirName={code:GetDefaultInstallDir}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=setup
+OutputBaseFilename=FlezBotSetup
 SetupIconFile=packaging\icon.ico
 UninstallDisplayIcon={app}\flez-bot.exe
 Compression=lzma2

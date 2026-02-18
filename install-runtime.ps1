@@ -22,6 +22,15 @@ function Write-InstallLog {
     Add-Content -Path $logPath -Value $line -Encoding UTF8
 }
 
+function Write-Utf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Content
+    )
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 function Write-Phase {
     param([string]$Name)
     Write-InstallLog ("========== " + $Name + " ==========")
@@ -230,7 +239,8 @@ try {
         }
         lastError = $null
     }
-    $stateObj | ConvertTo-Json -Depth 8 | Set-Content -Path $statePath -Encoding UTF8
+    $stateText = $stateObj | ConvertTo-Json -Depth 8
+    Write-Utf8NoBom -Path $statePath -Content ($stateText + "`n")
     Write-InstallLog ("STATE_WRITTEN: " + $statePath)
 
     Write-Phase "Complete"

@@ -21,6 +21,9 @@ __pycache__/
 installer_deps/*.exe
 installer_deps/*.source-url.txt
 
+# Runtime (bundled Python, etc.)
+runtime/python/
+
 # Build output (run bundle-setup.ps1 or pyinstaller / iscc)
 build/
 dist/

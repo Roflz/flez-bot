@@ -1,0 +1,105 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag (e.g. v1.2.3 or v1.2.3-alpha.1)"
+        required: true
+        type: string
+      channel:
+        description: "Update channel"
+        required: true
+        default: "alpha"
+        type: choice
+        options:
+          - alpha
+          - stable
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Resolve and validate tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = ""
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.version }}".Trim()
+          } else {
+            $tag = "${{ github.ref_name }}".Trim()
+          }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+            throw "Invalid release tag '$tag'. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-prerelease."
+          }
+          $normalized = $tag.Substring(1)
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "normalized=$normalized" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Resolve channel
+        id: channel
+        shell: pwsh
+        run: |
+          $channel = "alpha"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $channel = "${{ inputs.channel }}"
+          } elseif ("${{ steps.version.outputs.tag }}" -notmatch '-') {
+            $channel = "stable"
+          }
+          "value=$channel" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Build installer and release artifacts
+        shell: pwsh
+        run: |
+          $releaseBaseUrl = "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}"
+          ./bundle-setup.ps1 -Version "${{ steps.version.outputs.normalized }}" -Channel "${{ steps.channel.outputs.value }}" -ReleaseBaseUrl $releaseBaseUrl
+
+      - name: Upload build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: flez-bot-${{ steps.version.outputs.tag }}-windows
+          path: |
+            dist/FlezBotSetup.exe
+            dist/app-full.zip
+            dist/app-full.zip.sha256
+            dist/manifest.json
+            dist/manifest.json.sha256
+
+      - name: Publish GitHub release assets
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: |
+            dist/FlezBotSetup.exe
+            dist/app-full.zip
+            dist/app-full.zip.sha256
+            dist/manifest.json
+            dist/manifest.json.sha256

@@ -8,4 +8,4 @@ window.FLEZ_BOT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3
 window.FLEZ_BOT_SITE_URL = "https://flez-bot.vercel.app";
 window.FLEZ_BOT_SIGNUP_URL = window.FLEZ_BOT_SITE_URL + "/signup.html";
 window.FLEZ_BOT_PASSWORD_RESET_URL = window.FLEZ_BOT_SITE_URL + "/reset-password.html";
-window.FLEZ_BOT_DOWNLOAD_URL = "https://github.com/Roflz/flez-bot/releases/latest/download/setup.exe";
+window.FLEZ_BOT_DOWNLOAD_URL = "https://github.com/Roflz/flez-bot/releases/latest/download/FlezBotSetup.exe";

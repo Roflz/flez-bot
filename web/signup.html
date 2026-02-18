@@ -73,7 +73,7 @@
     </form>
     <div id="message"></div>
     <p style="margin-top:16px; font-size:0.85rem;"><a href="index.html">Back</a></p>
-    <p id="download-wrap" style="display:none; margin-top:12px; font-size:0.85rem;"><a href="#" id="download-link" style="color:#6ab;">Download setup.exe</a></p>
+    <p id="download-wrap" style="display:none; margin-top:12px; font-size:0.85rem;"><a href="#" id="download-link" style="color:#6ab;">Download FlezBotSetup.exe</a></p>
   </div>
 
   <script src="config.js"></script>
@@ -84,7 +84,7 @@
         var wrap = document.getElementById('download-wrap');
         var link = document.getElementById('download-link');
         link.href = url.trim();
-        link.download = 'setup.exe';
+        link.download = 'FlezBotSetup.exe';
         wrap.style.display = 'block';
       }
     })();

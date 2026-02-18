@@ -4,7 +4,7 @@ This document defines the build and release contract for installer/launcher/upda
 
 ## Bootstrap installer model
 
-`setup.exe` is intentionally small. It does not bundle the full runtime payload.
+`FlezBotSetup.exe` is intentionally small. It does not bundle the full runtime payload.
 
 Installer flow:
 
@@ -62,6 +62,8 @@ Run full build:
 ```powershell
 .\bundle-setup.ps1
 ```
+
+Release builds must run from an exact SemVer git tag at `HEAD` (for example `v1.2.3` or `v1.2.3-alpha.1`), unless a version is explicitly provided for local non-release testing.
 
 Generate release artifacts only:
 

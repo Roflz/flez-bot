@@ -9,7 +9,7 @@ Edit **`config.js`** (single source of truth; desktop app reads it too):
 - `FLEZ_BOT_SUPABASE_URL` — Supabase project URL
 - `FLEZ_BOT_SUPABASE_ANON_KEY` — Supabase anon (public) key
 - `FLEZ_BOT_SITE_URL` — Base URL of this site (e.g. `https://flez-bot.vercel.app`). Sign-up and reset URLs are derived from it.
-- `FLEZ_BOT_DOWNLOAD_URL` — Full URL to setup.exe (e.g. `https://github.com/Roflz/flez-bot/releases/latest/download/setup.exe`). If set, a “Download setup.exe” link appears on the pages.
+- `FLEZ_BOT_DOWNLOAD_URL` — Full URL to installer (e.g. `https://github.com/Roflz/flez-bot/releases/latest/download/FlezBotSetup.exe`). If set, a “Download FlezBotSetup.exe” link appears on the pages.
 
 ## Run locally
 
@@ -42,10 +42,10 @@ The Reset password email template should use `{{ .ConfirmationURL }}` for the li
 
 Users sign in from the **flez-bot desktop app**.
 
-## setup.exe download URL
+## Installer download URL
 
-- **Latest release:** Upload the installer as `setup.exe` to each GitHub release and use:
+- **Latest release:** Upload the installer as `FlezBotSetup.exe` to each GitHub release and use:
   ```text
-  https://github.com/Roflz/flez-bot/releases/latest/download/setup.exe
+  https://github.com/Roflz/flez-bot/releases/latest/download/FlezBotSetup.exe
   ```
 - Set this in `config.js` as `FLEZ_BOT_DOWNLOAD_URL`. Redeploy the site after changing config.
