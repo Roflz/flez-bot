@@ -4,7 +4,10 @@
 param(
     [string]$Channel = "alpha",
     [string]$ReleaseBaseUrl = "https://github.com/Roflz/flez-bot/releases/download/latest",
-    [string]$Version
+    [string]$Version,
+    [switch]$Incremental,
+    [ValidateSet("auto", "7z", "builtin")][string]$ArchiveBackend = "auto",
+    [int]$HeartbeatSeconds = 15
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,8 +39,31 @@ function Resolve-ReleaseVersion {
     return $value
 }
 
+function Resolve-Step2Backend {
+    param([string]$RequestedBackend)
+    if ($RequestedBackend -eq "7z" -or $RequestedBackend -eq "builtin") {
+        return $RequestedBackend
+    }
+    if (
+        (Get-Command 7z -ErrorAction SilentlyContinue) -or
+        (Get-Command 7za -ErrorAction SilentlyContinue) -or
+        (Test-Path "$env:ProgramFiles\7-Zip\7z.exe") -or
+        (Test-Path "${env:ProgramFiles(x86)}\7-Zip\7z.exe") -or
+        (Test-Path "$env:ProgramFiles\7-Zip\7za.exe") -or
+        (Test-Path "${env:ProgramFiles(x86)}\7-Zip\7za.exe")
+    ) {
+        return "7z"
+    }
+    return "builtin"
+}
+
 $resolvedVersion = Resolve-ReleaseVersion -InputVersion $Version
+$step2Backend = Resolve-Step2Backend -RequestedBackend $ArchiveBackend
 Write-Host ("Resolved release version: " + $resolvedVersion) -ForegroundColor Green
+if ($ArchiveBackend -eq "auto" -and $step2Backend -eq "builtin") {
+    Write-Host "7-Zip not detected. Step 2 will use built-in compression fallback." -ForegroundColor Yellow
+    Write-Host "Install 7-Zip to enable faster archive builds and richer progress output." -ForegroundColor Yellow
+}
 Write-Host ""
 
 Write-Host "==============================================" -ForegroundColor Cyan
@@ -59,7 +85,8 @@ Write-Host ""
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "  Step 2/4: Build app-full release artifacts" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
-& "$root\build-release-artifacts.ps1" -Channel $Channel -ReleaseBaseUrl $ReleaseBaseUrl -Version $resolvedVersion
+Write-Host ("  Step 2 mode: incremental={0}, backend={1}, heartbeat={2}s" -f $Incremental.IsPresent, $step2Backend, $HeartbeatSeconds) -ForegroundColor DarkGray
+& "$root\build-release-artifacts.ps1" -Channel $Channel -ReleaseBaseUrl $ReleaseBaseUrl -Version $resolvedVersion -Incremental:$($Incremental.IsPresent) -ArchiveBackend $ArchiveBackend -HeartbeatSeconds $HeartbeatSeconds
 if ($LASTEXITCODE -ne 0) { throw "build-release-artifacts.ps1 failed." }
 Write-Host ""
 
