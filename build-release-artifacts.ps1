@@ -1,6 +1,6 @@
 param(
     [string]$Channel = "alpha",
-    [string]$ReleaseBaseUrl = "https://github.com/Roflz/flez-bot/releases/download/latest",
+    [string]$ReleaseBaseUrl = "https://github.com/Roflz/flez-bot/releases/latest/download",
     [string]$Version,
     [switch]$RebuildRuntime,
     [switch]$Incremental,

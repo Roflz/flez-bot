@@ -3,7 +3,7 @@
 
 param(
     [string]$Channel = "alpha",
-    [string]$ReleaseBaseUrl = "https://github.com/Roflz/flez-bot/releases/download/latest",
+    [string]$ReleaseBaseUrl = "https://github.com/Roflz/flez-bot/releases/latest/download",
     [string]$Version,
     [switch]$Incremental,
     [ValidateSet("auto", "7z", "builtin")][string]$ArchiveBackend = "auto",
